@@ -1,0 +1,28 @@
+{
+  "name": "js13k-boatgame",
+  "version": "0.1.0",
+  "description": "A JS13K game",
+  "main": "src/index.html",
+  "repository": "https://github.com/ErikSom/js13k-boatgame.git",
+  "author": "Erik & Lomateron",
+  "license": "MIT",
+  "scripts": {
+    "build": "rollup -c; node cleanLiterals.js",
+    "watch": "npm-run-all --parallel watch:*",
+		"watch:rollup": "rollup -c -w",
+		"watch:server": "http-server dist"
+
+
+  },
+  "dependencies": {
+    "http-server": "^0.11.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.6.0",
+    "@babel/preset-env": "^7.6.0",
+    "npm-run-all": "^4.1.5",
+    "rollup": "^1.21.2",
+    "rollup-plugin-babel": "^4.3.3",
+    "rollup-plugin-terser": "^5.1.1"
+  }
+}

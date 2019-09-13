@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+        <style>
+            html, body, canvas{
+                padding:0;
+                margin:0;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas></canvas>
+
+        <script>
+            const canvas = document.querySelector('canvas');
+            const ctx = canvas.getContext("2d");
+            const w = 600;
+            const h = 600;
+            canvas.width = w;
+            canvas.height = h;
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+
+            canvas.style.backgroundColor = '#eaeaea'
+
+            let keyIsDown = {};
+
+            let objects = [];
+
+            let startPos = null;
+            let mousePos;
+
+            let currentTool = 0;
+
+            const increaseWidth = 2.0;
+
+            // SETTINGS FOR TOOLS
+            let currentAngle = 0;
+            let currentXRadius = 10;
+            let currentYRadius = 10;
+            let currentGap = 0.1
+            //
+
+            const types = {
+                enemy:0,
+                terrain:1,
+                current:2,
+                hero:3
+            }
+            const strokeColors = ['#FF0000', '#eb973e', '#0000FF', '#00FF00']
+
+            const drawTools = {
+                drawEnemyLine: 0,
+                drawEnemyCircle:1,
+                drawTerrainLine:2,
+                drawTerrainDonut:3,
+                drawCurrent:4,
+                drawHero:5,
+            }
+            const drawToolData =[
+                {type:types.enemy}, //0
+                {type:types.enemy}, //1
+                {type:types.terrain}, //2
+                {type:types.terrain}, //3
+                {type:types.current}, //4
+                {type:types.hero}, //5
+            ]
+
+            canvas.onmousedown = (e) =>{
+                startPos = {x:e.clientX, y:e.clientY}
+            }
+            canvas.onmousemove = (e) =>{
+                mousePos = {x:e.clientX, y:e.clientY}
+            }
+            canvas.onmouseup = (e) =>{
+                const endPos = {x:e.clientX, y:e.clientY}
+                const type = currentTool;
+
+                if(currentTool == drawTools.drawEnemyLine || currentTool == drawTools.drawTerrainLine){
+                    objects.push({p1:startPos, p2:endPos, type})
+                }else if(currentTool == drawTools.drawCurrent){
+                    objects.push({p1:startPos, xRadius:currentXRadius, yRadius:currentYRadius, angle:currentAngle, type})
+                }else if(currentTool == drawTools.drawTerrainDonut){
+                    objects.push({p1:startPos, radius:currentXRadius, rotation:currentAngle, gap:currentGap, type})
+                }else if(currentTool == drawTools.drawEnemyCircle){
+                    objects.push({p1:startPos, radius:currentXRadius, type});
+                }else if(currentTool == drawTools.drawHero){
+                    objects.push({p1:startPos, angle:currentAngle, type});
+                }
+                startPos = null;
+            }
+
+            const keys = {
+                a:65,
+                g:71,
+                h:72,
+                w:87,
+                plus:187,
+                minus:189,
+                backspace:8
+            }
+            document.onkeydown = (e) =>{
+                if(!keyIsDown[e.keyCode]){
+                    //fire once
+                    if(e.keyCode == keys.backspace) objects.pop();
+                }
+                keyIsDown[e.keyCode] = true;
+                //handle keys
+                if(keyIsDown[keys.a]){
+                    //change angle
+                    if(e.keyCode == keys.plus){
+                        currentAngle+=increaseWidth;
+                        if(currentAngle>360) currentAngle = 0;
+                     }else if(e.keyCode == keys.minus){
+                        currentAngle-=increaseWidth;
+                        if(currentAngle<0) currentAngle = 360;
+                     }
+                }else if(keyIsDown[keys.w]){
+                    //change x radius
+                    if(e.keyCode == keys.plus){
+                        currentXRadius += increaseWidth;
+                    }else if(e.keyCode == keys.minus){
+                        currentXRadius -= increaseWidth;
+                    }
+                }else if(keyIsDown[keys.h]){
+                    //change y radius
+                    if(e.keyCode == keys.plus){
+                        currentYRadius += increaseWidth;
+                    }else if(e.keyCode == keys.minus){
+                        currentYRadius -= increaseWidth;
+                    }
+                }else if(keyIsDown[keys.g]){
+                    //change y radius
+                    if(e.keyCode == keys.plus){
+                        currentGap += increaseWidth/50.0;
+                        currentGap = Math.min(0.99999, currentGap);
+                    }else if(e.keyCode == keys.minus){
+                        currentGap -= increaseWidth/50.0;
+                        currentGap = Math.max(0.00001, currentGap);
+                    }
+                }
+
+                const numKey = e.keyCode-48
+                if(numKey >= 0 && numKey<=9){
+
+                    Object.keys(drawTools).forEach(key=>{
+                        if(drawTools[key] === numKey){
+                             console.log("Set tool", key)
+                             currentTool = numKey;
+                        }
+                    })
+                }
+            }
+            document.onkeyup = (e) =>{
+                keyIsDown[e.keyCode] = false;
+            }
+            const drawObjects = ()=>{
+                objects.forEach(object =>{
+                    const toolType = drawToolData[object.type].type
+                    if(object.type == drawTools.drawEnemyLine || object.type == drawTools.drawTerrainLine){
+                        ctx.strokeStyle = strokeColors[toolType];
+                        ctx.beginPath();
+                        ctx.moveTo(object.p1.x, object.p1.y);
+                        ctx.lineTo(object.p2.x, object.p2.y);
+                        ctx.stroke();
+                    }else if(object.type == drawTools.drawCurrent){
+                        ctx.strokeStyle = strokeColors[toolType];
+
+                        ctx.beginPath();
+                        ctx.ellipse(object.p1.x, object.p1.y, object.xRadius, object.yRadius, 0, 0, Math.PI*2)
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(object.p1.x,object.p1.y);
+                        const lineLength = 30;
+                        const angle = object.angle * (Math.PI/180)
+                        ctx.lineTo(object.p1.x+lineLength*Math.cos(angle), object.p1.y+lineLength*Math.sin(angle))
+                        ctx.stroke();
+                    }else if(object.type == drawTools.drawTerrainDonut){
+                        ctx.strokeStyle = strokeColors[toolType];
+
+                        drawDonut(ctx, object.p1, object.radius, object.rotation, object.gap);
+
+                    }else if(object.type == drawTools.drawEnemyCircle){
+                        ctx.strokeStyle = strokeColors[toolType];
+                        ctx.fillStyle = strokeColors[toolType];
+
+
+                        drawCircle(ctx, object.p1, object.radius);
+                    }else if(object.type == drawTools.drawHero){
+                        ctx.strokeStyle = strokeColors[toolType];
+
+                        const rectSize = 10;
+                        ctx.rect(object.p1.x-rectSize, object.p1.y-rectSize, rectSize*2, rectSize*2);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(object.p1.x,object.p1.y);
+                        const lineLength = 30;
+                        const angle = object.angle * (Math.PI/180)
+                        ctx.lineTo(object.p1.x+lineLength*Math.cos(angle), object.p1.y+lineLength*Math.sin(angle))
+                        ctx.stroke();
+                    }
+                })
+            }
+
+            const convertNumber = (n, l) => {
+                const l2 = l/2;
+                let r = n-l2;
+                return r/l2
+            }
+
+            const convertToStringNumber = (n) =>{
+                let r = Math.round(n*100)/100;
+                r = r.toString()
+                if(r.indexOf('.') < 0) r = r+'.';
+                return r;
+            }
+
+            const renderToCode = () =>{
+                copyLevelData();
+                
+                let levelData = '';
+
+                let terrainCode = `float terrainHeight(vec2 u)\n{\n\nfloat r = 0.;\nfloat w = 0.05;\n`
+                let waterCurrentCode = `vec2 waterCurrents(vec2 u){\n\nvec2 v = vec2(.0);\n`;
+                let objectShapeCode = `vec4 objectsShape(vec2 u)\n{\nvec4 r = vec4(0.);\nfloat w = 0.05;\nvec4 color = vec4(.6,.4,.4,1.);\n`;
+                //                 vec4 color = vec4(.6,.4,.4,1.);
+                // drawLine(r, u, vec2(0.34, 0.5), vec2(-0.34, 0.16), 0.03)*color;
+
+                console.log("Start log:")
+                console.log("***********************************************")
+                objects.forEach(object =>{
+                    if(object.type == drawTools.drawEnemyLine || object.type == drawTools.drawTerrainLine){
+                        const x1 = convertToStringNumber(convertNumber(object.p1.x, w));
+                        const y1 = convertToStringNumber(convertNumber(object.p1.y, h)*-1);
+                        const x2 = convertToStringNumber(convertNumber(object.p2.x, w));
+                        const y2 = convertToStringNumber(convertNumber(object.p2.y, h)*-1);
+
+
+                        const extraColorCode = (object.type == drawTools.drawEnemyLine) ? '*color' : '';
+
+                        const func = `drawLine(r, u, vec2(${x1}, ${y1}), vec2(${x2}, ${y2}), w)${extraColorCode};\n`
+
+
+                        if(object.type == drawTools.drawEnemyLine) objectShapeCode += func;
+                        if(object.type == drawTools.drawTerrainLine) terrainCode += func;
+                    }else if(object.type == drawTools.drawCurrent){
+
+
+
+                        const x = convertToStringNumber(convertNumber(object.p1.x, w));
+                        const y = convertToStringNumber(convertNumber(object.p1.y, h)*-1);
+
+
+                        // 800 / 2^X = 800/10
+                        // 1)800 / 80 = 10
+                        // 2)80 = 800/10
+                        // 3)2^X = 80
+                        // 4)Math.log(80) / Math.log(2) = 10
+
+                        let exp = Math.log(w/object.xRadius) / Math.log(2);
+                        const sx = convertToStringNumber(exp);
+
+                        exp = Math.log(h/object.yRadius) / Math.log(2);
+                        const sy = convertToStringNumber(exp);
+
+                        angle = object.angle * Math.PI / 180;
+                        const ax = convertToStringNumber(Math.cos(angle));
+                        const ay = convertToStringNumber(Math.sin(angle));
+
+                        const func = `drawCurrent(v, u, vec2(${x}, ${y}), vec2(${sx}, ${sy}), vec2(${ax}, ${ay}));\n`
+                        // v+= drawCurrent(u, vec2(0, 0), vec2(3., 3.), vec2(0., 1.));
+                        waterCurrentCode += func;
+                    }else if(object.type == drawTools.drawTerrainDonut){
+                        const x = convertToStringNumber(convertNumber(object.p1.x, w));
+                        const y = convertToStringNumber(convertNumber(object.p1.y, h)*-1);
+
+                        let exp = 2.0*object.radius/canvas.width;
+                        const s = convertToStringNumber(exp);
+
+                        const r = convertToStringNumber((object.rotation/360.0));
+                        const g = convertToStringNumber(1.0-object.gap);
+
+                        const func = `drawDonut(r, u, vec2(${x}, ${y}), ${s}, ${r}, ${g}, w);\n`
+                        //    r+= drawCircle(u, vec2(.3, .6), 0.2, 0.6, 0.8, 1.);
+                        terrainCode += func;
+
+                    }else if(object.type == drawTools.drawEnemyCircle){
+                        const x = convertToStringNumber(convertNumber(object.p1.x, w)*-1);
+                        const y = convertToStringNumber(convertNumber(object.p1.y, h));
+
+
+                        let exp = 2.0*object.radius/canvas.width;
+                        const s = convertToStringNumber(exp);
+
+                        const func = `a = (u+vec2(${x},${y}))*(1./${s});\nr+= float(1.-length(a) >= 0.)*vec4(.6,.4,.4,1.);\n`
+                        objectShapeCode += func;
+
+                    }else if(object.type == drawTools.drawHero){
+                        const x = convertToStringNumber(convertNumber(object.p1.x, w)*-1);
+                        const y = convertToStringNumber(convertNumber(object.p1.y, h));
+
+                        console.log(object.angle+Math.PI/2);
+
+                        const a = convertToStringNumber((object.angle+90) * Math.PI / 180);
+
+                        const func = `r+= drawBoat(r, u, vec2(${x}, ${y}), ${a})*myBoatsColor();\n`
+                        objectShapeCode += func;
+
+                    }
+                })
+
+                terrainCode += `return r;\n}`;
+                objectShapeCode += `return r;\n}`;
+                waterCurrentCode += `return v;\n}`;
+
+                console.log(terrainCode+'\n'+objectShapeCode+'\n'+waterCurrentCode);
+                console.log("***********************************************")
+                console.log("End log.")
+
+
+            }
+
+
+            const update = ()=>{
+                ctx.clearRect(0, 0, w, h)
+                drawObjects();
+
+                ctx.strokeStyle = 'black';
+                if(startPos){
+                    ctx.beginPath();
+                    ctx.moveTo(startPos.x, startPos.y);
+                    ctx.lineTo(mousePos.x, mousePos.y);
+                    ctx.stroke();
+                }
+
+                if(currentTool == drawTools.drawCurrent){
+                    ctx.setLineDash([5, 5]);
+
+                    ctx.beginPath();
+                    ctx.ellipse(mousePos.x, mousePos.y, currentXRadius, currentYRadius, 0, 0, Math.PI*2)
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(mousePos.x,mousePos.y);
+                    const lineLength = 30;
+                    const angle = currentAngle * (Math.PI/180)
+                    ctx.lineTo(mousePos.x+lineLength*Math.cos(angle), mousePos.y+lineLength*Math.sin(angle))
+                    ctx.stroke();
+
+                    ctx.setLineDash([]);
+                }else if(currentTool == drawTools.drawTerrainDonut){
+                    drawDonut(ctx, mousePos, currentXRadius, currentAngle, currentGap);
+                }else if(currentTool == drawTools.drawEnemyCircle){
+                    drawCircle(ctx, mousePos, currentXRadius);
+                }else if(currentTool == drawTools.drawHero){
+                    const rectSize = 10;
+                    ctx.rect(mousePos.x-rectSize, mousePos.y-rectSize, rectSize*2, rectSize*2);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(mousePos.x,mousePos.y);
+                    const lineLength = 30;
+                    const angle = currentAngle * (Math.PI/180)
+                    ctx.lineTo(mousePos.x+lineLength*Math.cos(angle), mousePos.y+lineLength*Math.sin(angle))
+                    ctx.stroke();
+                }
+
+                rAF = window.requestAnimationFrame(update);
+            }
+
+            let rAF = window.requestAnimationFrame(update);
+
+            const copyLevelData = ()=>{
+                const string = JSON.stringify(objects);
+
+                const levelData = document.querySelector('#levelData');
+                levelData.value = string;
+
+                levelData.select(); 
+                levelData.setSelectionRange(0, 99999); /*For mobile devices*/
+
+                /* Copy the text inside the text field */
+                document.execCommand("copy");
+
+                /* Alert the copied text */
+                console.log("Copied the text: " + levelData.value);
+            }
+            const loadLevelData = ()=>{
+44
+                const levelData = document.querySelector('#levelData');
+
+               if(levelData.value){
+                   objects = JSON.parse(levelData.value);
+               }
+                /* Alert the copied text */
+                console.log("Level data loaded");
+            }
+
+
+            //DRAW METHODS
+            const drawDonut = (ctx, pos, radius, rotation, gap) =>{
+                ctx.beginPath();
+                const gapRadius = (gap*Math.PI*2);
+                const startRotation = -gapRadius/2;
+                rotation = rotation * (Math.PI/180)
+                ctx.arc(pos.x, pos.y, radius, rotation+startRotation+gapRadius, rotation+startRotation);
+                ctx.stroke();
+            }
+            const drawCircle = (ctx, pos, radius) =>{
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, radius, 0, Math.PI*2);
+                ctx.stroke();
+                ctx.fill();
+            }
+
+
+        </script>
+        <br>
+        <button onclick="copyLevelData()">Copy Level</button>
+        <button onclick="loadLevelData()">Load Level</button>
+        <br>
+        <textarea id="levelData" placeholder="level data.."></textarea>
+        <br>
+        <button onclick="renderToCode()">Generate Level Code</button>
+    </body>
+</html>
